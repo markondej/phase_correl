@@ -8,6 +8,7 @@ Phase correlation feature matching was described by Yan H. and Liu J.G. in artic
 
 At first two monochromatic images are created, both containing squares of the same size but in different places. 
 ![Squares](squares.png)
+
 Next, 2D Fourier transform is applied on each of them, normalised cross power spectrum is computed, and inverted 2D Fourier transform is applied. Finally algorightm searches for a peak in obtained matrix, where address of peak found should match shift between images.
 
 ## How to compile
