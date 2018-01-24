@@ -136,6 +136,7 @@ int main()
     double *fft_input2 = (double*)malloc(sizeof(double)*256*128*2);
     double *fft_output = (double*)malloc(sizeof(double)*256*128*2);
 
+    // Convert image pixels to complex number format, use only real part
     for (j = 0; j < 128; j++) {
         for (i = 0; i < 256; i++) {
             fft_input1[(i+j*256)*2] = (double)image1[i+j*256];
@@ -150,7 +151,7 @@ int main()
     fft2D(fft_input1, 256, 128);
     fft2D(fft_input2, 256, 128);
 
-    // Compute nomalised cross power spectrum
+    // Compute normalized cross power spectrum
     for (j = 0; j < 128; j++)
         for (i = 0; i < 256; i++) {
             double a = fft_input1[(i+j*256)*2];
