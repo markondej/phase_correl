@@ -207,7 +207,7 @@ int main()
     if (ty > 128/2)
         ty = ty-128;
 
-    printf("Computed translation: [%d, %d]\n", tx, ty);
+    printf("Computed shift: [%d, %d]\n", tx, ty);
 
     free(fft_input1);
     free(fft_input2);
