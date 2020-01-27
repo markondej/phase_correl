@@ -141,35 +141,15 @@ void computeShift(unsigned char *image1, unsigned char *image2, int width, int h
         double c = fft_input2[i << 1];
         double d = fft_input2[(i << 1) + 1];
 
-        double a1, a2;
-
-        if (b != 0.0) {
-            if (a != 0.0) {
-                a1 = atan(fabs(b / a));
-            }
-            else {
-                a1 = M_PI / 2.0;
-            }
+        double a1 = (b != 0.0) ? ((a != 0.0) ? atan(b / fabs(a)) : M_PI * b / (2.0 * fabs(b))) : 0.0;
+        if (a < 0.0) {
+            a1 = ((b < 0.0) ? -1.0 : 1.0) * M_PI - a1;
         }
-        else a1 = 0.0;
 
-        if ((a < 0.0) && (b > 0.0)) a1 = M_PI - a1;
-        if ((a < 0.0) && (b < 0.0)) a1 = M_PI + a1;
-        if ((a > 0.0) && (b < 0.0)) a1 = 2.0 * M_PI - a1;
-
-        if (d != 0.0) {
-            if (c != 0.0) {
-                a2 = atan(fabs(d / c));
-            }
-            else {
-                a2 = M_PI / 2.0;
-            }
+        double a2 = (d != 0.0) ? ((c != 0.0) ? atan(d / fabs(c)) : M_PI * d / (2.0 * fabs(d))) : 0.0;
+        if (c < 0.0) {
+            a2 = ((d < 0.0) ? -1.0 : 1.0) * M_PI - a2;
         }
-        else a2 = 0.0;
-
-        if ((c < 0.0) && (d > 0.0)) a2 = M_PI - a2;
-        if ((c < 0.0) && (d < 0.0)) a2 = M_PI + a2;
-        if ((c > 0.0) && (d < 0.0)) a2 = 2.0 * M_PI - a2;
 
         fft_output[i << 1] = cos(a1 - a2);
         fft_output[(i << 1) + 1] = sin(a1 - a2);
