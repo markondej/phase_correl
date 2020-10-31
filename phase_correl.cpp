@@ -166,14 +166,14 @@ public:
     }
 private:
     static void ComputeNormalized(double *input1, double *input2, double *output) {
-        double a1 = (input1[1] != 0.0f) ? ((input1[0] != 0.0f) ? atan(input1[1] / fabs(input1[0])) : static_cast<float>(M_PI) * input1[1] / (2.0f * fabs(input1[1]))) : 0.0f;
+        double a1 = (input1[1] != 0.0f) ? ((input1[0] != 0.0f) ? atan(input1[1] / abs(input1[0])) : M_PI * input1[1] / (2.0f * abs(input1[1]))) : 0.0f;
         if (input1[0] < 0.0f) {
-            a1 = ((input1[1] < 0.0f) ? -1.0f : 1.0f) * static_cast<double>(M_PI) - a1;
+            a1 = ((input1[1] < 0.0f) ? -1.0f : 1.0f) * M_PI - a1;
         }
 
-        double a2 = (input2[1] != 0.0f) ? ((input2[0] != 0.0f) ? atan(input2[1] / fabs(input2[0])) : static_cast<float>(M_PI) * input2[1] / (2.0f * fabs(input2[1]))) : 0.0f;
+        double a2 = (input2[1] != 0.0f) ? ((input2[0] != 0.0f) ? atan(input2[1] / abs(input2[0])) : M_PI * input2[1] / (2.0f * abs(input2[1]))) : 0.0f;
         if (input2[0] < 0.0f) {
-            a2 = ((input2[1] < 0.0f) ? -1.0f : 1.0f) * static_cast<double>(M_PI) - a2;
+            a2 = ((input2[1] < 0.0f) ? -1.0f : 1.0f) * M_PI - a2;
         }
 
         output[0] = cos(a1 - a2);
