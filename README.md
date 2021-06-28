@@ -16,7 +16,7 @@ Next, 2D Fourier transform is applied on each of them, normalised cross power sp
 
 Simply clone this repository on linux machine by typing:
 ```
-git clone https://github.com/markondej/phase_correlation.git
+git clone https://github.com/markondej/phase_correl.git
 ```
 Then build executable binary with "make" command:
 ```
