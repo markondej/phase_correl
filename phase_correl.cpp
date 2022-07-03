@@ -295,7 +295,7 @@ int main()
 
     PhaseCorrelation::ComputeShift(image1, image2, deltax, deltay);
 
-    std::cout << "Computed shift: [" << deltax << ", " << deltay << "]" << std::endl;
+    std::cout << "Calculated shift: [" << deltax << ", " << deltay << "]" << std::endl;
 
     return 0;
 }
