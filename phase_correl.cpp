@@ -1,18 +1,8 @@
 ﻿#include <cmath>
 #include <iostream>
 #include <cstring>
-#ifdef USE_OPENCV
-#include <opencv2/opencv.hpp>
-#ifdef _WIN32
-#ifndef _DEBUG
-#pragma comment(lib, "opencv_world3412.lib")
-#else
-#pragma comment(lib, "opencv_world3412d.lib")
-#endif
-#endif
-#endif
+#include <climits>
 
-#ifndef USE_OPENCV
 class GrayscaleImage {
 public:
     GrayscaleImage(unsigned width, unsigned height, unsigned char fill) {
@@ -36,9 +26,9 @@ public:
         height = source.height;
         return *this;
     }
-    void DrawRectangle(unsigned startx, unsigned starty, unsigned width, unsigned height, unsigned char fill) {
-        for (unsigned j = starty; j < starty + height; j++) {
-            for (unsigned i = startx; i < startx + width; i++) {
+    void DrawRectangle(unsigned x, unsigned y, unsigned width, unsigned height, unsigned char fill) {
+        for (unsigned j = y; j < y + height; j++) {
+            for (unsigned i = x; i < x + width; i++) {
                 if ((i < this->width) && (j < this->height)) {
                     data[i + j * this->width] = fill;
                 }
@@ -66,31 +56,20 @@ private:
     unsigned char *data;
 };
 
-#endif
 class PhaseCorrelation {
 public:
     PhaseCorrelation() = delete;
     PhaseCorrelation(const PhaseCorrelation&) = delete;
     PhaseCorrelation(PhaseCorrelation&&) = delete;
     PhaseCorrelation &operator=(const PhaseCorrelation&) = delete;
-#ifndef USE_OPENCV
     static void ComputeShift(const GrayscaleImage &image1, const GrayscaleImage &image2, int &deltax, int &deltay) {
         if ((image1.GetWidth() != image2.GetWidth()) || (image1.GetHeight() != image2.GetHeight())) {
             throw std::runtime_error("Wrong image size");
         }
 
         unsigned width = image1.GetWidth(), height = image1.GetHeight();
-#else
-    static void ComputeShift(const cv::Mat &image1, const cv::Mat &image2, int &deltax, int &deltay) {
-        if (image1.size != image2.size) {
-            throw std::runtime_error("Wrong image size");
-        }
-
-        unsigned width = (unsigned)image1.cols, height = (unsigned)image1.rows;
-#endif
 
         // Convert image pixels to complex number format, use only real part
-#ifndef USE_OPENCV
         double *data1 = new double[(width * height) << 1];
         double *data2 = new double[(width * height) << 1];
 
@@ -101,25 +80,10 @@ public:
             data1[(i << 1) + 1] = 0.0;
             data2[(i << 1) + 1] = 0.0;
         } 
-#else
-        cv::Mat planes1[] = { cv::Mat_<double>(image1), cv::Mat::zeros(2, image1.size, CV_64F) };
-        cv::Mat planes2[] = { cv::Mat_<double>(image2), cv::Mat::zeros(2, image2.size, CV_64F) };
-        cv::Mat complex1, complex2;
-        cv::merge(planes1, 2, complex1);
-        cv::merge(planes2, 2, complex2);
-#endif
 
         // Perform 2D FFT on each image
-#ifndef USE_OPENCV
         FFT2D(data1, width, height);
         FFT2D(data2, width, height);
-#else
-        cv::dft(complex1, complex1);
-        cv::dft(complex2, complex2);
-
-        double *data1 = reinterpret_cast<double *>(complex1.data);
-        double *data2 = reinterpret_cast<double *>(complex2.data);
-#endif
 
         // Compute normalized cross power spectrum
         for (unsigned i = 0; i < width * height; i++) {
@@ -127,38 +91,26 @@ public:
         }
 
         // Perform inversed 2D FFT on obtained matrix
-#ifndef USE_OPENCV
         IFFT2D(data1, width, height);
 
         for (unsigned i = 0; i < width * height; i++) {
             data1[i << 1] = sqrt(pow(data1[i << 1], 2) + pow(data1[(i << 1) + 1], 2));
         }
-#else
-        cv::dft(complex1, complex1, cv::DFT_INVERSE);
-
-        cv::split(complex1, planes1);
-        cv::magnitude(planes1[0], planes1[1], planes1[0]);
-        data1 = reinterpret_cast<double *>(&planes1[0].data[0]);
-#endif
 
         // Search for peak
         double max = 0.0; deltax = 0; deltay = 0;
         for (unsigned j = 0; j < height; j++)
             for (unsigned i = 0; i < width; i++) {
                 unsigned offset = i + j * width;
-#ifndef USE_OPENCV
                 offset = offset << 1;
-#endif
                 if (data1[offset] > max) {
                     max = data1[offset]; deltax = i; deltay = j;
                 }
             }
 
-#ifndef USE_OPENCV
         delete[] data1;
         delete[] data2;
 
-#endif
         if ((unsigned)deltax > width >> 1)
             deltax = deltax - width;
         if ((unsigned)deltay > height >> 1)
@@ -179,37 +131,85 @@ private:
         output[0] = cos(a1 - a2);
         output[1] = sin(a1 - a2);
     }
-#ifndef USE_OPENCV
-    static void DitFFT2(double *input, double *output, unsigned size, int stride, bool invert) {
-        if (size > 1) {
-            DitFFT2(&input[0], &output[0], size >> 1, stride << 1, invert);
-            DitFFT2(&input[stride << 1], &output[size], size >> 1, stride << 1, invert);
+    static void Radix2FFT(double *input, double *output, std::size_t stride) {
+        output[0] = input[0] + input[stride << 1];
+        output[1] = input[1] + input[(stride << 1) + 1];
 
-            double fi = (invert ? 2.0 : -2.0) * M_PI / (double)size, kfi = 0.0;
-            for (unsigned k = 0; k < size; k += 2) {
-                double cosfi = cos(kfi), sinfi = sin(kfi), temp[] = {
-                    output[k], 
-                    output[k + 1], 
-                    output[size + k], 
-                    output[size + k + 1]
+        output[2] = input[0] - input[(stride << 1)];
+        output[3] = input[1] - input[(stride << 1) + 1];
+    }
+    static void Sum2FFT(double *input, double *output, std::size_t size, bool inverse) {
+        double dfi = (inverse ? 2.0 : -2.0) * M_PI / (double)(size << 1),
+            kfi = 0.0;
+
+        for (std::size_t k = 0; k < size; k++) {
+            double cosfi = cos(kfi), sinfi = sin(kfi),
+                temp[] = {
+                    input[k << 1],
+                    input[(k << 1) + 1],
+                    input[(k + size) << 1],
+                    input[((k + size) << 1) + 1]
                 };
 
-                output[k] = temp[0] + temp[2] * cosfi - temp[3] * sinfi;
-                output[k + 1] = temp[1] + temp[2] * sinfi + temp[3] * cosfi;
-                output[size + k] = temp[0] - temp[2] * cosfi + temp[3] * sinfi;
-                output[size + k + 1] = temp[1] - temp[2] * sinfi - temp[3] * cosfi;
-                kfi += fi;
-            }
-        } else {
-            output[0] = input[0];
-            output[1] = input[1];
+            output[k << 1] = temp[0] + cosfi * temp[2] - sinfi * temp[3];
+            output[(k << 1) + 1] = temp[1] + sinfi * temp[2] + cosfi * temp[3];
+            output[(k + size) << 1] = temp[0] - temp[2] * cosfi + temp[3] * sinfi;
+            output[((k + size) << 1) + 1] = temp[1] - temp[2] * sinfi - temp[3] * cosfi;
+            kfi += dfi;
         }
     }
-    static inline void FFT(double *input, double *output, unsigned size) {
-        DitFFT2(input, output, size, 1, false);
+    static std::size_t *Gen2FFTOffsets(std::size_t size) {
+        std::size_t *offsets = new std::size_t[size],
+            stride = 2, step;
+
+        std::memset(offsets, 0xff, sizeof(std::size_t) * size);
+        offsets[0] = 0;
+        if (size > 1) {
+            offsets[size >> 1] = 1;
+        }
+
+        for (step = size >> 2; step > 0; step >>= 1) {
+            std::size_t base = 0;
+            for (std::size_t i = 0; i < size; i += step) {
+                if (offsets[i] != SIZE_MAX) {
+                    base = offsets[i];
+                } else {
+                    offsets[i] = base + stride;
+                }
+            }
+            stride <<= 1;
+        }
+
+        return offsets;
     }
-    static inline void IFFT(double *input, double *output, unsigned size) {
-        DitFFT2(input, output, size, 1, true);
+    static void Dit2FFT(double *input, double *output, std::size_t size, bool inverse) {
+        std::size_t *offsets = Gen2FFTOffsets(size >> 1),
+            stride = 1;
+
+        while (size > 2) {
+            stride <<= 1;
+            size >>= 1;
+        }
+
+        for (std::size_t i = 0; i < stride; i++) {
+            Radix2FFT(&input[offsets[i] << 1], &output[i << 2], stride);
+        }
+
+        delete[] offsets;
+
+        while (stride > 1) {
+            stride >>= 1;
+            size <<= 1;
+            for (std::size_t i = 0; i < stride; i++) {
+                Sum2FFT(&output[(i * size) << 1], &output[(i * size) << 1], size >> 1, inverse);
+            }
+        }
+    }
+    static inline void FFT(double *input, double *output, std::size_t size) {
+        Dit2FFT(input, output, size, false);
+    }
+    static inline void IFFT(double *input, double *output, std::size_t size) {
+        Dit2FFT(input, output, size, true);
     }
     static void FFT2D(double *input, unsigned width, unsigned height) {
         double *fft_input = new double[(width > height ? width : height) << 1];
@@ -255,8 +255,8 @@ private:
             }
             IFFT(fft_input, fft_output, height);
             for (unsigned j = 0; j < height; j++) {
-                fft_temp[(i + j * width) << 1] = fft_output[j << 1] / (double)height;
-                fft_temp[((i + j * width) << 1) + 1] = fft_output[(j << 1) + 1] / (double)height;
+                fft_temp[(i + j * width) << 1] = fft_output[j << 1] / static_cast<double>(height);
+                fft_temp[((i + j * width) << 1) + 1] = fft_output[(j << 1) + 1] / static_cast<double>(height);
             }
         }
         for (unsigned j = 0; j < height; j++) {
@@ -266,8 +266,8 @@ private:
             }
             IFFT(fft_input, fft_output, width);
             for (unsigned i = 0; i < width; i++) {
-                input[(i + j * width) << 1] = fft_output[i << 1] / (double)width;
-                input[((i + j * width) << 1) + 1] = fft_output[(i << 1) + 1] / (double)width;
+                input[(i + j * width) << 1] = fft_output[i << 1] / static_cast<double>(width);
+                input[((i + j * width) << 1) + 1] = fft_output[(i << 1) + 1] / static_cast<double>(width);
             }
         }
 
@@ -275,7 +275,6 @@ private:
         delete[] fft_output;
         delete[] fft_temp;
     }
-#endif
 };
 
 int main()
@@ -283,15 +282,9 @@ int main()
     int deltax, deltay;
 
     // Generate pair of images
-#ifndef USE_OPENCV
     GrayscaleImage image1(256, 128, 0x00), image2(256, 128, 0xff);
     image1.DrawRectangle(16, 32, 60, 60, 0x80);
     image2.DrawRectangle(8, 40, 60, 60, 0x10);
-#else
-    cv::Mat image1(128, 256, CV_8UC1, cv::Scalar(0x00)), image2(128, 256, CV_8UC1, cv::Scalar(0xff));
-    cv::rectangle(image1, cv::Rect(16, 32, 60, 60), cv::Scalar(0x80), -1);
-    cv::rectangle(image2, cv::Rect(8, 40, 60, 60), cv::Scalar(0x10), -1);
-#endif
 
     PhaseCorrelation::ComputeShift(image1, image2, deltax, deltay);
 

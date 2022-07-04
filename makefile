@@ -2,7 +2,8 @@ FLAGS = -Wall -O3
 LIBS = -lm
 
 all:
-	g++ $(FLAGS) $(LIBS) -o phase_correl phase_correl.cpp
+	g++ $(FLAGS) -o phase_correl_cpp phase_correl.cpp $(LIBS)
+	gcc $(FLAGS) -o phase_correl_c phase_correl.c $(LIBS)
 
 clean:
 	rm ./phase_correl
