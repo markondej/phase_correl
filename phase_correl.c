@@ -157,7 +157,11 @@ void computeNormalized(const double *f, const double *g, double *r) {
     r[1] = sin(a1 - a2);
 }
 
-void computeShift(const unsigned char *image1, const unsigned char *image2, unsigned width, unsigned height, int *deltax, int *deltay) {
+int computeShift(const unsigned char *image1, const unsigned char *image2, unsigned width, unsigned height, int *deltax, int *deltay) {
+    if (!width || (width & (width - 1)) || !height || (height & (height - 1))) {
+        return -1;
+    }
+
     unsigned i, j;
 
     double* fft_input1 = (double *)malloc((sizeof(double) * width * height) << 1);
@@ -205,6 +209,8 @@ void computeShift(const unsigned char *image1, const unsigned char *image2, unsi
     free(fft_input1);
     free(fft_input2);
     free(fft_output);
+
+    return 0;
 }
 
 int main()

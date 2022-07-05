@@ -64,16 +64,20 @@ public:
     PhaseCorrelation(PhaseCorrelation&&) = delete;
     PhaseCorrelation &operator=(const PhaseCorrelation&) = delete;
     static void ComputeShift(const GrayscaleImage &image1, const GrayscaleImage &image2, int &deltax, int &deltay) {
-        if ((image1.GetWidth() != image2.GetWidth()) || (image1.GetHeight() != image2.GetHeight())) {
-            throw std::runtime_error("Wrong image size");
+        if ((image1.GetWidth() != image2.GetWidth()) || (image1.GetHeight() != image2.GetHeight()) || !image1.GetWidth() || (image1.GetWidth() & (image1.GetWidth() - 1)) || !image1.GetHeight() || (image1.GetHeight() & (image1.GetHeight() - 1))) {
+            throw std::runtime_error("Image dimensions must be equal!");
+        }
+
+        if (!image1.GetWidth() || (image1.GetWidth() & (image1.GetWidth() - 1)) || !image1.GetHeight() || (image1.GetHeight() & (image1.GetHeight() - 1))) {
+            throw std::runtime_error("Image dimensions must be power of 2!");
         }
 
         unsigned width = image1.GetWidth(), height = image1.GetHeight();
 
-        // Convert image pixels to complex number format, use only real part
-        std::complex<double> *data1 = new std::complex<double>[(width * height) << 1];
-        std::complex<double> *data2 = new std::complex<double>[(width * height) << 1];
+        std::complex<double> *data1 = new std::complex<double>[width * height];
+        std::complex<double> *data2 = new std::complex<double>[width * height];
 
+        // Convert image pixels to complex number format, use only real part
         for (unsigned i = 0; i < width * height; i++) {
             data1[i] = { static_cast<double>(image1.GetData()[i]), 0.0 };
             data2[i] = { static_cast<double>(image2.GetData()[i]), 0.0 };
@@ -88,7 +92,7 @@ public:
             ComputeNormalized(data1[i], data2[i], data1[i]);
         }
 
-        // Perform inversed 2D FFT on obtained matrix
+        // Perform inverse 2D FFT on obtained matrix
         FFT2D(data1, width, height, true);
 
         // Search for peak
