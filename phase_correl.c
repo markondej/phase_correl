@@ -85,12 +85,17 @@ void dit2fft(const double *input, double *output, unsigned size, int inverse) {
     }
 }
 
-void fft2D(double *data, unsigned width, unsigned height) {
+void fft2D(double *data, unsigned width, unsigned height, int inverse) {
     unsigned i, j;
 
     double *fft_input = (double *)malloc((sizeof(double) * width) << 1);
     double *fft_output = (double *)malloc((sizeof(double) * width) << 1);
 
+    if (inverse) {
+        goto horizontal_fft;
+    }
+
+vertical_fft:
     for (j = 0; j < height; j++) {
         unsigned offset = j * width;
         for (i = 0; i < width; i++) {
@@ -98,63 +103,7 @@ void fft2D(double *data, unsigned width, unsigned height) {
             fft_input[(i << 1) + 1] = data[(offset << 1) + 1];
             offset++;
         }
-        dit2fft(fft_input, fft_output, width, 0);
-        offset = j * width;
-        for (i = 0; i < width; i++) {
-            data[offset << 1] = fft_output[i << 1];
-            data[(offset << 1) + 1] = fft_output[(i << 1) + 1];
-            offset++;
-        }
-    }
-    for (i = 0; i < width; i++) {
-        unsigned offset = i;
-        for (j = 0; j < height; j++) {
-            fft_input[j << 1] = data[offset << 1];
-            fft_input[(j << 1) + 1] = data[(offset << 1) + 1];
-            offset += width;
-        }
-        dit2fft(fft_input, fft_output, height, 0);
-        offset = i;
-        for (j = 0; j < height; j++) {
-            data[offset << 1] = fft_output[j << 1];
-            data[(offset << 1) + 1] = fft_output[(j << 1) + 1];
-            offset += width;
-        }
-    }
-
-    free(fft_input);
-    free(fft_output);
-}
-
-void ifft2D(double *data, int width, int height) {
-    unsigned i, j;
-
-    double *fft_input = (double *)malloc((sizeof(double) * width) << 1);
-    double *fft_output = (double *)malloc((sizeof(double) * width) << 1);
-
-    for (i = 0; i < width; i++) {
-        unsigned offset = i;
-        for (j = 0; j < height; j++) {
-            fft_input[j << 1] = data[offset << 1];
-            fft_input[(j << 1) + 1] = data[(offset << 1) + 1];
-            offset += width;
-        }
-        dit2fft(fft_input, fft_output, height, 1);
-        offset = i;
-        for (j = 0; j < height; j++) {
-            data[offset << 1] = fft_output[j << 1];
-            data[(offset << 1) + 1] = fft_output[(j << 1) + 1];
-            offset += width;
-        }
-    }
-    for (j = 0; j < height; j++) {
-        unsigned offset = j * width;
-        for (i = 0; i < width; i++) {
-            fft_input[i << 1] = data[offset << 1];
-            fft_input[(i << 1) + 1] = data[(offset << 1) + 1];
-            offset++;
-        }
-        dit2fft(fft_input, fft_output, width, 1);
+        dit2fft(fft_input, fft_output, width, inverse);
         offset = j * width;
         for (i = 0; i < width; i++) {
             data[offset << 1] = fft_output[i << 1];
@@ -163,6 +112,32 @@ void ifft2D(double *data, int width, int height) {
         }
     }
 
+    if (inverse) {
+        goto done;
+    }
+
+horizontal_fft:
+    for (i = 0; i < width; i++) {
+        unsigned offset = i;
+        for (j = 0; j < height; j++) {
+            fft_input[j << 1] = data[offset << 1];
+            fft_input[(j << 1) + 1] = data[(offset << 1) + 1];
+            offset += width;
+        }
+        dit2fft(fft_input, fft_output, height, inverse);
+        offset = i;
+        for (j = 0; j < height; j++) {
+            data[offset << 1] = fft_output[j << 1];
+            data[(offset << 1) + 1] = fft_output[(j << 1) + 1];
+            offset += width;
+        }
+    }
+
+    if (inverse) {
+        goto vertical_fft;
+    }
+
+done:
     free(fft_input);
     free(fft_output);
 }
@@ -199,16 +174,16 @@ void computeShift(const unsigned char *image1, const unsigned char *image2, unsi
     }
 
     // Perform 2D FFT on each image
-    fft2D(fft_input1, width, height);
-    fft2D(fft_input2, width, height);
+    fft2D(fft_input1, width, height, 0);
+    fft2D(fft_input2, width, height, 0);
 
     // Compute normalized cross power spectrum
     for (i = 0; i < width * height; i++) {
         computeNormalized(&fft_input1[i << 1], &fft_input2[i << 1], &fft_output[i << 1]);
     }
 
-    // Perform inversed 2D FFT on obtained matrix
-    ifft2D(fft_output, width, height);
+    // Perform inverse 2D FFT on obtained matrix
+    fft2D(fft_output, width, height, 1);
 
     // Search for peak
     unsigned offset = 0;

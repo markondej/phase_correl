@@ -89,7 +89,7 @@ public:
         }
 
         // Perform inversed 2D FFT on obtained matrix
-        IFFT2D(data1, width, height);
+        FFT2D(data1, width, height, true);
 
         // Search for peak
         unsigned offset = 0;
@@ -198,69 +198,48 @@ private:
             }
         }
     }
-    static void FFT2D(std::complex<double> *data, unsigned width, unsigned height) {
+    static void FFT2D(std::complex<double> *data, unsigned width, unsigned height, bool inverse = false) {
         std::complex<double>  *fft_input = new std::complex<double>[width > height ? width : height];
         std::complex<double>  *fft_output = new std::complex<double>[width > height ? width : height];
 
-        for (unsigned j = 0; j < height; j++) {
-            unsigned offset = j * width;
+        auto horizontal_fft = [&]() {
             for (unsigned i = 0; i < width; i++) {
-                fft_input[i] = data[offset];
-                offset++;
+                unsigned offset = i;
+                for (unsigned j = 0; j < height; j++) {
+                    fft_input[j] = data[offset];
+                    offset += width;
+                }
+                Dit2FFT(fft_input, fft_output, height, inverse);
+                offset = i;
+                for (unsigned j = 0; j < height; j++) {
+                    data[offset] = fft_output[j];
+                    offset += width;
+                }
             }
-            Dit2FFT(fft_input, fft_output, width);
-            offset = j * width;
-            for (unsigned i = 0; i < width; i++) {
-                data[offset] = fft_output[i];
-                offset++;
-            }
-        }
-        for (unsigned i = 0; i < width; i++) {
-            unsigned offset = i;
-            for (unsigned j = 0; j < height; j++) {
-                fft_input[j] = data[offset];
-                offset += width;
-            }
-            Dit2FFT(fft_input, fft_output, height);
-            offset = i;
-            for (unsigned j = 0; j < height; j++) {
-                data[offset] = fft_output[j];
-                offset += width;
-            }
-        }
+        };
 
-        delete[] fft_input;
-        delete[] fft_output;
-    }
-    static void IFFT2D(std::complex<double> *data, unsigned width, unsigned height) {
-        std::complex<double> *fft_input = new std::complex<double>[width > height ? width : height];
-        std::complex<double> *fft_output = new std::complex<double>[width > height ? width : height];
+        auto vertical_fft = [&]() {
+            for (unsigned j = 0; j < height; j++) {
+                unsigned offset = j * width;
+                for (unsigned i = 0; i < width; i++) {
+                    fft_input[i] = data[offset];
+                    offset++;
+                }
+                Dit2FFT(fft_input, fft_output, width, inverse);
+                offset = j * width;
+                for (unsigned i = 0; i < width; i++) {
+                    data[offset] = fft_output[i];
+                    offset++;
+                }
+            }
+        };
 
-        for (unsigned i = 0; i < width; i++) {
-            unsigned offset = i;
-            for (unsigned j = 0; j < height; j++) {
-                fft_input[j] = data[offset];
-                offset += width;
-            }
-            Dit2FFT(fft_input, fft_output, height, true);
-            offset = i;
-            for (unsigned j = 0; j < height; j++) {
-                data[offset] = fft_output[j];
-                offset += width;
-            }
-        }
-        for (unsigned j = 0; j < height; j++) {
-            unsigned offset = j * width;
-            for (unsigned i = 0; i < width; i++) {
-                fft_input[i] = data[offset];
-                offset++;
-            }
-            Dit2FFT(fft_input, fft_output, width, true);
-            offset = j * width;
-            for (unsigned i = 0; i < width; i++) {
-                data[offset] = fft_output[i];
-                offset++;
-            }
+        if (!inverse) {
+            vertical_fft();
+            horizontal_fft();
+        } else {
+            horizontal_fft();
+            vertical_fft();
         }
 
         delete[] fft_input;
