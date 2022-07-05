@@ -4,7 +4,7 @@
 #include <limits.h>
 #include <math.h>
 
-void radix2fft(double *input, double *output, unsigned stride) {
+void radix2fft(const double *input, double *output, unsigned stride) {
     output[0] = input[0] + input[stride << 1];
     output[1] = input[1] + input[(stride << 1) + 1];
 
@@ -12,7 +12,7 @@ void radix2fft(double *input, double *output, unsigned stride) {
     output[3] = input[1] - input[(stride << 1) + 1];
 }
 
-void sum2fft(double *input, double *output, unsigned size, int inverse) {
+void sum2fft(const double *input, double *output, unsigned size, int inverse) {
     unsigned k;
 
     double temp[4], cosfi, sinfi,
@@ -26,8 +26,8 @@ void sum2fft(double *input, double *output, unsigned size, int inverse) {
 
         output[k << 1] = temp[0] + cosfi * temp[2] - sinfi * temp[3];
         output[(k << 1) + 1] = temp[1] + sinfi * temp[2] + cosfi * temp[3];
-        output[(k + size) << 1] = temp[0] - temp[2] * cosfi + temp[3] * sinfi;
-        output[((k + size) << 1) + 1] = temp[1] - temp[2] * sinfi - temp[3] * cosfi;
+        output[(k + size) << 1] = temp[0] - cosfi * temp[2] + sinfi * temp[3];
+        output[((k + size) << 1) + 1] = temp[1] - sinfi * temp[2] - cosfi * temp[3];
         kfi += dfi;
     }
 }
@@ -54,7 +54,7 @@ unsigned *gen2fftorder(unsigned size) {
     return offset;
 }
 
-void dit2fft(double *input, double *output, unsigned size, int inverse) {
+void dit2fft(const double *input, double *output, unsigned size, int inverse) {
     unsigned *offset = gen2fftorder(size >> 1),
         stride = 1, i;
 
@@ -64,7 +64,7 @@ void dit2fft(double *input, double *output, unsigned size, int inverse) {
     }
 
     for (i = 0; i < stride; i++) {
-        radix2fft(&input[offset[i] << 1], &output[i << 2], stride);
+        radix2fft(&input[offset[i] << 1], &output[(i * 2) << 1], stride);
     }
 
     free(offset);
@@ -78,100 +78,104 @@ void dit2fft(double *input, double *output, unsigned size, int inverse) {
     }
 }
 
-void fft(double *input, double *output, unsigned size) {
-    dit2fft(input, output, size, 0);
-}
-
-void ifft(double *input, double *output, unsigned size) {
-    dit2fft(input, output, size, 1);
-}
-
-void fft2D(double *input, unsigned width, unsigned height) {
+void fft2D(double *data, unsigned width, unsigned height) {
     unsigned i, j;
 
     double *fft_input = (double *)malloc((sizeof(double) * width) << 1);
     double *fft_output = (double *)malloc((sizeof(double) * width) << 1);
-    double *fft_temp = (double *)malloc((sizeof(double) * width * height) << 1);
 
     for (j = 0; j < height; j++) {
+        unsigned offset = j * width;
         for (i = 0; i < width; i++) {
-            fft_input[i << 1] = input[(i + j * width) << 1];
-            fft_input[(i << 1) + 1] = input[((i + j * width) << 1) + 1];
+            fft_input[i << 1] = data[offset << 1];
+            fft_input[(i << 1) + 1] = data[(offset << 1) + 1];
+            offset++;
         }
-        fft(fft_input, fft_output, width);
+        dit2fft(fft_input, fft_output, width, 0);
+        offset = j * width;
         for (i = 0; i < width; i++) {
-            fft_temp[(i + j * width) << 1] = fft_output[i << 1];
-            fft_temp[((i + j * width) << 1) + 1] = fft_output[(i << 1) + 1];
+            data[offset << 1] = fft_output[i << 1];
+            data[(offset << 1) + 1] = fft_output[(i << 1) + 1];
+            offset++;
         }
     }
     for (i = 0; i < width; i++) {
+        unsigned offset = i;
         for (j = 0; j < height; j++) {
-            fft_input[j << 1] = fft_temp[(i + j * width) << 1];
-            fft_input[(j << 1) + 1] = fft_temp[((i + j * width) << 1) + 1];
+            fft_input[j << 1] = data[offset << 1];
+            fft_input[(j << 1) + 1] = data[(offset << 1) + 1];
+            offset += width;
         }
-        fft(fft_input, fft_output, height);
+        dit2fft(fft_input, fft_output, height, 0);
+        offset = i;
         for (j = 0; j < height; j++) {
-            input[(i + j * width) << 1] = fft_output[j << 1];
-            input[((i + j * width) << 1) + 1] = fft_output[(j << 1) + 1];
+            data[offset << 1] = fft_output[j << 1];
+            data[(offset << 1) + 1] = fft_output[(j << 1) + 1];
+            offset += width;
         }
     }
 
     free(fft_input);
     free(fft_output);
-    free(fft_temp);
 }
 
-void ifft2D(double *input, int width, int height) {
+void ifft2D(double *data, int width, int height) {
     unsigned i, j;
 
     double *fft_input = (double *)malloc((sizeof(double) * width) << 1);
     double *fft_output = (double *)malloc((sizeof(double) * width) << 1);
-    double *fft_temp = (double *)malloc((sizeof(double) * width * height) << 1);
 
     for (i = 0; i < width; i++) {
+        unsigned offset = i;
         for (j = 0; j < height; j++) {
-            fft_input[j << 1] = input[(i + j * width) << 1];
-            fft_input[(j << 1) + 1] = input[((i + j * width) << 1) + 1];
+            fft_input[j << 1] = data[offset << 1];
+            fft_input[(j << 1) + 1] = data[(offset << 1) + 1];
+            offset += width;
         }
-        ifft(fft_input, fft_output, height);
+        dit2fft(fft_input, fft_output, height, 1);
+        offset = i;
         for (j = 0; j < height; j++) {
-            fft_temp[(i + j * width) << 1] = fft_output[j << 1] / (double)height;
-            fft_temp[((i + j * width) << 1) + 1] = fft_output[(j << 1) + 1] / (double)height;
+            data[offset << 1] = fft_output[j << 1] / (double)height;
+            data[(offset << 1) + 1] = fft_output[(j << 1) + 1] / (double)height;
+            offset += width;
         }
     }
     for (j = 0; j < height; j++) {
+        unsigned offset = j * width;
         for (i = 0; i < width; i++) {
-            fft_input[i << 1] = fft_temp[(i + j * width) << 1];
-            fft_input[(i << 1) + 1] = fft_temp[((i + j * width) << 1) + 1];
+            fft_input[i << 1] = data[offset << 1];
+            fft_input[(i << 1) + 1] = data[(offset << 1) + 1];
+            offset++;
         }
-        ifft(fft_input, fft_output, width);
+        dit2fft(fft_input, fft_output, width, 1);
+        offset = j * width;
         for (i = 0; i < width; i++) {
-            input[(i + j * width) << 1] = fft_output[i << 1] / (double)width;
-            input[((i + j * width) << 1) + 1] = fft_output[(i << 1) + 1] / (double)width;
+            data[offset << 1] = fft_output[i << 1] / (double)width;
+            data[(offset << 1) + 1] = fft_output[(i << 1) + 1] / (double)width;
+            offset++;
         }
     }
 
     free(fft_input);
     free(fft_output);
-    free(fft_temp);
 }
 
-void computeNormalized(double *f, double *g, double *r) {
-    double a1 = (f[1] != 0.0f) ? ((f[0] != 0.0f) ? atan(f[1] / abs(f[0])) : M_PI * f[1] / (2.0f * abs(f[1]))) : 0.0f;
-    if (f[0] < 0.0f) {
-        a1 = ((f[1] < 0.0f) ? -1.0f : 1.0f) * M_PI - a1;
+void computeNormalized(const double *f, const double *g, double *r) {
+    double a1 = (f[1] != 0.0) ? ((f[0] != 0.0) ? atan(f[1] / abs(f[0])) : copysign(M_PI, f[1]) / 2.0) : 0.0;
+    if (f[0] < 0.0) {
+        a1 = ((f[1] < 0.0) ? -1.0 : 1.0) * M_PI - a1;
     }
 
-    double a2 = (g[1] != 0.0f) ? ((g[0] != 0.0f) ? atan(g[1] / abs(g[0])) : M_PI * g[1] / (2.0f * abs(g[1]))) : 0.0f;
-    if (g[0] < 0.0f) {
-        a2 = ((g[1] < 0.0f) ? -1.0f : 1.0f) * M_PI - a2;
+    double a2 = (g[1] != 0.0) ? ((g[0] != 0.0) ? atan(g[1] / abs(g[0])) : copysign(M_PI, g[1]) / 2.0) : 0.0;
+    if (g[0] < 0.0) {
+        a2 = ((g[1] < 0.0) ? -1.0 : 1.0) * M_PI - a2;
     }
 
     r[0] = cos(a1 - a2);
     r[1] = sin(a1 - a2);
 }
 
-void computeShift(unsigned char *image1, unsigned char *image2, unsigned width, unsigned height, int *deltax, int *deltay) {
+void computeShift(const unsigned char *image1, const unsigned char *image2, unsigned width, unsigned height, int *deltax, int *deltay) {
     unsigned i, j;
 
     double* fft_input1 = (double *)malloc((sizeof(double) * width * height) << 1);
@@ -200,13 +204,15 @@ void computeShift(unsigned char *image1, unsigned char *image2, unsigned width, 
     ifft2D(fft_output, width, height);
 
     // Search for peak
+    unsigned offset = 0;
     double max = 0.0; *deltax = 0; *deltay = 0;
     for (j = 0; j < height; j++)
         for (i = 0; i < width; i++) {
-            double d = sqrt(pow(fft_output[(i + j * width) << 1], 2) + pow(fft_output[((i + j * width) << 1) + 1], 2));
+            double d = sqrt(pow(fft_output[offset << 1], 2) + pow(fft_output[(offset << 1) + 1], 2));
             if (d > max) {
                 max = d; *deltax = i; *deltay = j;
             }
+            offset++;
         }
 
     if (*deltax > width >> 1)
@@ -230,15 +236,16 @@ int main()
     // Generate pair of images
     for (j = 0; j < 128; j++)
         for (i = 0; i < 256; i++) {
+            unsigned offset = i + j * 256;
             if ((i >= 16) && (i < 76) && (j >= 32) && (j < 92))
-                image1[i + j * 256] = 128;
+                image1[offset] = 128;
             else
-                image1[i + j * 256] = 0;
+                image1[offset] = 0;
 
             if ((i >= 8) && (i < 68) && (j >= 40) && (j < 100))
-                image2[i + j * 256] = 16;
+                image2[offset] = 16;
             else
-                image2[i + j * 256] = 255;
+                image2[offset] = 255;
         }
 
     computeShift(image1, image2, 256, 128, &deltax, &deltay);

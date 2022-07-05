@@ -2,6 +2,7 @@
 #include <iostream>
 #include <cstring>
 #include <climits>
+#include <complex>
 
 class GrayscaleImage {
 public:
@@ -70,15 +71,12 @@ public:
         unsigned width = image1.GetWidth(), height = image1.GetHeight();
 
         // Convert image pixels to complex number format, use only real part
-        double *data1 = new double[(width * height) << 1];
-        double *data2 = new double[(width * height) << 1];
+        std::complex<double> *data1 = new std::complex<double>[(width * height) << 1];
+        std::complex<double> *data2 = new std::complex<double>[(width * height) << 1];
 
         for (unsigned i = 0; i < width * height; i++) {
-            data1[i << 1] = (double)image1.GetData()[i];
-            data2[i << 1] = (double)image2.GetData()[i];
-
-            data1[(i << 1) + 1] = 0.0;
-            data2[(i << 1) + 1] = 0.0;
+            data1[i] = { static_cast<double>(image1.GetData()[i]), 0.0 };
+            data2[i] = { static_cast<double>(image2.GetData()[i]), 0.0 };
         } 
 
         // Perform 2D FFT on each image
@@ -87,25 +85,22 @@ public:
 
         // Compute normalized cross power spectrum
         for (unsigned i = 0; i < width * height; i++) {
-            ComputeNormalized(&data1[i << 1], &data2[i << 1], &data1[i << 1]);
+            ComputeNormalized(data1[i], data2[i], data1[i]);
         }
 
         // Perform inversed 2D FFT on obtained matrix
         IFFT2D(data1, width, height);
 
-        for (unsigned i = 0; i < width * height; i++) {
-            data1[i << 1] = sqrt(pow(data1[i << 1], 2) + pow(data1[(i << 1) + 1], 2));
-        }
-
         // Search for peak
+        unsigned offset = 0;
         double max = 0.0; deltax = 0; deltay = 0;
         for (unsigned j = 0; j < height; j++)
             for (unsigned i = 0; i < width; i++) {
-                unsigned offset = i + j * width;
-                offset = offset << 1;
-                if (data1[offset] > max) {
-                    max = data1[offset]; deltax = i; deltay = j;
+                double d = sqrt(pow(data1[offset].real(), 2) + pow(data1[offset].imag(), 2));
+                if (d > max) {
+                    max = d; deltax = i; deltay = j;
                 }
+                offset++;
             }
 
         delete[] data1;
@@ -117,44 +112,39 @@ public:
             deltay = deltay - height;
     }
 private:
-    static void ComputeNormalized(double *input1, double *input2, double *output) {
-        double a1 = (input1[1] != 0.0f) ? ((input1[0] != 0.0f) ? atan(input1[1] / abs(input1[0])) : M_PI * input1[1] / (2.0f * abs(input1[1]))) : 0.0f;
-        if (input1[0] < 0.0f) {
-            a1 = ((input1[1] < 0.0f) ? -1.0f : 1.0f) * M_PI - a1;
+    static void ComputeNormalized(const std::complex<double> &input1, const std::complex<double> &input2, std::complex<double> &output) {
+        double a1 = (input1.imag() != 0.0) ? ((input1.real() != 0.0) ? atan(input1.imag() / abs(input1.real())) : std::copysign(M_PI, input1.imag()) / 2.0) : 0.0;
+        if (input1.real() < 0.0) {
+            a1 = ((input1.imag() < 0.0) ? -1.0 : 1.0) * M_PI - a1;
         }
 
-        double a2 = (input2[1] != 0.0f) ? ((input2[0] != 0.0f) ? atan(input2[1] / abs(input2[0])) : M_PI * input2[1] / (2.0f * abs(input2[1]))) : 0.0f;
-        if (input2[0] < 0.0f) {
-            a2 = ((input2[1] < 0.0f) ? -1.0f : 1.0f) * M_PI - a2;
+        double a2 = (input2.imag() != 0.0) ? ((input2.real() != 0.0) ? atan(input2.imag() / abs(input2.real())) : std::copysign(M_PI, input2.imag()) / 2.0) : 0.0;
+        if (input2.real() < 0.0) {
+            a2 = ((input2.imag() < 0.0) ? -1.0 : 1.0) * M_PI - a2;
         }
 
-        output[0] = cos(a1 - a2);
-        output[1] = sin(a1 - a2);
+        output.real(cos(a1 - a2));
+        output.imag(sin(a1 - a2));
     }
-    static void Radix2FFT(double *input, double *output, std::size_t stride) {
-        output[0] = input[0] + input[stride << 1];
-        output[1] = input[1] + input[(stride << 1) + 1];
+    static void Radix2FFT(const std::complex<double> *input, std::complex<double> *output, std::size_t stride) {
+        output[0].real(input[0].real() + input[stride].real());
+        output[0].imag(input[0].imag() + input[stride].imag());
 
-        output[2] = input[0] - input[(stride << 1)];
-        output[3] = input[1] - input[(stride << 1) + 1];
+        output[1].real(input[0].real() - input[stride].real());
+        output[1].imag(input[0].imag() - input[stride].imag());
     }
-    static void Sum2FFT(double *input, double *output, std::size_t size, bool inverse) {
-        double dfi = (inverse ? 2.0 : -2.0) * M_PI / (double)(size << 1),
+    static void Sum2FFT(const std::complex<double> *input, std::complex<double> *output, std::size_t size, bool inverse) {
+        double dfi = (inverse ? 2.0 : -2.0) * M_PI / static_cast<double>(size << 1),
             kfi = 0.0;
 
         for (std::size_t k = 0; k < size; k++) {
-            double cosfi = cos(kfi), sinfi = sin(kfi),
-                temp[] = {
-                    input[k << 1],
-                    input[(k << 1) + 1],
-                    input[(k + size) << 1],
-                    input[((k + size) << 1) + 1]
-                };
+            double cosfi = cos(kfi), sinfi = sin(kfi);
+            std::complex<double> temp[] = { input[k], input[k + size] };
 
-            output[k << 1] = temp[0] + cosfi * temp[2] - sinfi * temp[3];
-            output[(k << 1) + 1] = temp[1] + sinfi * temp[2] + cosfi * temp[3];
-            output[(k + size) << 1] = temp[0] - temp[2] * cosfi + temp[3] * sinfi;
-            output[((k + size) << 1) + 1] = temp[1] - temp[2] * sinfi - temp[3] * cosfi;
+            output[k].real(temp[0].real() + cosfi * temp[1].real() - sinfi * temp[1].imag());
+            output[k].imag(temp[0].imag() + sinfi * temp[1].real() + cosfi * temp[1].imag());
+            output[k + size].real(temp[0].real() - cosfi * temp[1].real() + sinfi * temp[1].imag());
+            output[k + size].imag(temp[0].imag() - sinfi * temp[1].real() - cosfi * temp[1].imag());
             kfi += dfi;
         }
     }
@@ -179,7 +169,7 @@ private:
 
         return offset;
     }
-    static void Dit2FFT(double *input, double *output, std::size_t size, bool inverse) {
+    static void Dit2FFT(const std::complex<double> *input, std::complex<double> *output, std::size_t size, bool inverse = false) {
         std::size_t *offset = GenInputOrder(size >> 1),
             stride = 1;
 
@@ -189,7 +179,7 @@ private:
         }
 
         for (std::size_t i = 0; i < stride; i++) {
-            Radix2FFT(&input[offset[i] << 1], &output[i << 2], stride);
+            Radix2FFT(&input[offset[i]], &output[i * 2], stride);
         }
 
         delete[] offset;
@@ -198,79 +188,77 @@ private:
             stride >>= 1;
             size <<= 1;
             for (std::size_t i = 0; i < stride; i++) {
-                Sum2FFT(&output[(i * size) << 1], &output[(i * size) << 1], size >> 1, inverse);
+                Sum2FFT(&output[i * size], &output[i * size], size >> 1, inverse);
             }
         }
     }
-    static inline void FFT(double *input, double *output, std::size_t size) {
-        Dit2FFT(input, output, size, false);
-    }
-    static inline void IFFT(double *input, double *output, std::size_t size) {
-        Dit2FFT(input, output, size, true);
-    }
-    static void FFT2D(double *input, unsigned width, unsigned height) {
-        double *fft_input = new double[(width > height ? width : height) << 1];
-        double *fft_output = new double[(width > height ? width : height) << 1];
-        double *fft_temp = new double[(width * height) << 1];
+    static void FFT2D(std::complex<double> *data, unsigned width, unsigned height) {
+        std::complex<double>  *fft_input = new std::complex<double>[width > height ? width : height];
+        std::complex<double>  *fft_output = new std::complex<double>[width > height ? width : height];
 
         for (unsigned j = 0; j < height; j++) {
+            unsigned offset = j * width;
             for (unsigned i = 0; i < width; i++) {
-                fft_input[i << 1] = input[(i + j * width) << 1];
-                fft_input[(i << 1) + 1] = input[((i + j * width) << 1) + 1];
+                fft_input[i] = data[offset];
+                offset++;
             }
-            FFT(fft_input, fft_output, width);
+            Dit2FFT(fft_input, fft_output, width);
+            offset = j * width;
             for (unsigned i = 0; i < width; i++) {
-                fft_temp[(i + j * width) << 1] = fft_output[i << 1];
-                fft_temp[((i + j * width) << 1) + 1] = fft_output[(i << 1) + 1];
+                data[offset] = fft_output[i];
+                offset++;
             }
         }
         for (unsigned i = 0; i < width; i++) {
+            unsigned offset = i;
             for (unsigned j = 0; j < height; j++) {
-                fft_input[j << 1] = fft_temp[(i + j * width) << 1];
-                fft_input[(j << 1) + 1] = fft_temp[((i + j * width) << 1) + 1];
+                fft_input[j] = data[offset];
+                offset += width;
             }
-            FFT(fft_input, fft_output, height);
+            Dit2FFT(fft_input, fft_output, height);
+            offset = i;
             for (unsigned j = 0; j < height; j++) {
-                input[(i + j * width) << 1] = fft_output[j << 1];
-                input[((i + j * width) << 1) + 1] = fft_output[(j << 1) + 1];
+                data[offset] = fft_output[j];
+                offset += width;
             }
         }
 
         delete[] fft_input;
         delete[] fft_output;
-        delete[] fft_temp;
     }
-    static void IFFT2D(double *input, unsigned width, unsigned height) {
-        double *fft_input = new double[(width > height ? width : height) << 1];
-        double *fft_output = new double[(width > height ? width : height) << 1];
-        double *fft_temp = new double[(width * height) << 1];
+    static void IFFT2D(std::complex<double> *data, unsigned width, unsigned height) {
+        std::complex<double> *fft_input = new std::complex<double>[width > height ? width : height];
+        std::complex<double> *fft_output = new std::complex<double>[width > height ? width : height];
 
         for (unsigned i = 0; i < width; i++) {
+            unsigned offset = i;
             for (unsigned j = 0; j < height; j++) {
-                fft_input[j << 1] = input[(i + j * width) << 1];
-                fft_input[(j << 1) + 1] = input[((i + j * width) << 1) + 1];
+                fft_input[j] = data[offset];
+                offset += width;
             }
-            IFFT(fft_input, fft_output, height);
+            Dit2FFT(fft_input, fft_output, height, true);
+            offset = i;
             for (unsigned j = 0; j < height; j++) {
-                fft_temp[(i + j * width) << 1] = fft_output[j << 1] / static_cast<double>(height);
-                fft_temp[((i + j * width) << 1) + 1] = fft_output[(j << 1) + 1] / static_cast<double>(height);
+                data[offset] = fft_output[j] / static_cast<double>(height);
+                offset += width;
             }
         }
         for (unsigned j = 0; j < height; j++) {
+            unsigned offset = j * width;
             for (unsigned i = 0; i < width; i++) {
-                fft_input[i << 1] = fft_temp[(i + j * width) << 1];
-                fft_input[(i << 1) + 1] = fft_temp[((i + j * width) << 1) + 1];
+                fft_input[i] = data[offset];
+                offset++;
             }
-            IFFT(fft_input, fft_output, width);
+            Dit2FFT(fft_input, fft_output, width, true);
+            offset = j * width;
             for (unsigned i = 0; i < width; i++) {
-                input[(i + j * width) << 1] = fft_output[i << 1] / static_cast<double>(width);
-                input[((i + j * width) << 1) + 1] = fft_output[(i << 1) + 1] / static_cast<double>(width);
+                data[offset] = fft_output[i] / static_cast<double>(width);
+                offset++;
             }
         }
 
         delete[] fft_input;
         delete[] fft_output;
-        delete[] fft_temp;
     }
 };
 
