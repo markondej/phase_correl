@@ -191,6 +191,12 @@ private:
                 Sum2FFT(&output[i * size], &output[i * size], size >> 1, inverse);
             }
         }
+
+        if (inverse) {
+            for (std::size_t i = 0; i < size; i++) {
+                output[i] /= static_cast<double>(size);
+            }
+        }
     }
     static void FFT2D(std::complex<double> *data, unsigned width, unsigned height) {
         std::complex<double>  *fft_input = new std::complex<double>[width > height ? width : height];
@@ -239,7 +245,7 @@ private:
             Dit2FFT(fft_input, fft_output, height, true);
             offset = i;
             for (unsigned j = 0; j < height; j++) {
-                data[offset] = fft_output[j] / static_cast<double>(height);
+                data[offset] = fft_output[j];
                 offset += width;
             }
         }
@@ -252,7 +258,7 @@ private:
             Dit2FFT(fft_input, fft_output, width, true);
             offset = j * width;
             for (unsigned i = 0; i < width; i++) {
-                data[offset] = fft_output[i] / static_cast<double>(width);
+                data[offset] = fft_output[i];
                 offset++;
             }
         }

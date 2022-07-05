@@ -76,6 +76,13 @@ void dit2fft(const double *input, double *output, unsigned size, int inverse) {
             sum2fft(&output[(i * size) << 1], &output[(i * size) << 1], size >> 1, inverse);
         }
     }
+
+    if (inverse) {
+        for (i = 0; i < size; i++) {
+            output[i << 1] /= (double)size;
+            output[(i << 1) + 1] /= (double)size;
+        }
+    }
 }
 
 void fft2D(double *data, unsigned width, unsigned height) {
@@ -135,8 +142,8 @@ void ifft2D(double *data, int width, int height) {
         dit2fft(fft_input, fft_output, height, 1);
         offset = i;
         for (j = 0; j < height; j++) {
-            data[offset << 1] = fft_output[j << 1] / (double)height;
-            data[(offset << 1) + 1] = fft_output[(j << 1) + 1] / (double)height;
+            data[offset << 1] = fft_output[j << 1];
+            data[(offset << 1) + 1] = fft_output[(j << 1) + 1];
             offset += width;
         }
     }
@@ -150,8 +157,8 @@ void ifft2D(double *data, int width, int height) {
         dit2fft(fft_input, fft_output, width, 1);
         offset = j * width;
         for (i = 0; i < width; i++) {
-            data[offset << 1] = fft_output[i << 1] / (double)width;
-            data[(offset << 1) + 1] = fft_output[(i << 1) + 1] / (double)width;
+            data[offset << 1] = fft_output[i << 1];
+            data[(offset << 1) + 1] = fft_output[(i << 1) + 1];
             offset++;
         }
     }
