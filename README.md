@@ -12,6 +12,10 @@ At first two monochromatic images are created, both containing squares of the sa
 
 Next, 2D Fourier transform is applied on each of them, normalised cross power spectrum is computed, and inverted 2D Fourier transform is applied. Finally algorightm searches for a peak in obtained matrix, where offset of peak found should match shift between images.
 
+## Used FFT algorithm
+
+For sake of simplicity used FFT is based on Radix-2 Cooley-Tukey alogrithm with input order calculation (not bit-reverse approach). Earlier versions (see: tags) have used recursive algorithm which (combined with large input images) might cause heap-overfill errors. Input order may be precalculated and more efficient radix may be used in order to improve performance.
+
 ## How to compile
 
 Simply clone this repository on linux machine by typing:

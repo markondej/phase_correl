@@ -32,33 +32,30 @@ void sum2fft(double *input, double *output, unsigned size, int inverse) {
     }
 }
 
-unsigned *radix2offsets(unsigned size) {
-    unsigned *offsets = (unsigned *)malloc(sizeof(unsigned) * size),
-        stride = 2, step;
+unsigned *gen2fftorder(unsigned size) {
+    unsigned *offset = (unsigned *)malloc(sizeof(unsigned) * size),
+        stride = 1, step;
 
-    memset(offsets, 0xff, sizeof(unsigned) * size);
-    offsets[0] = 0;
-    if (size > 1) {
-        offsets[size >> 1] = 1;
-    }
+    memset(offset, 0xff, sizeof(unsigned) * size);
+    offset[0] = 0;
 
-    for (step = size >> 2; step > 0; step >>= 1) {
+    for (step = size >> 1; step > 0; step >>= 1) {
         unsigned base = 0, i;
         for (i = 0; i < size; i += step) {
-            if (offsets[i] != UINT_MAX) {
-                base = offsets[i];
+            if (offset[i] != UINT_MAX) {
+                base = offset[i];
             } else {
-                offsets[i] = base + stride;
+                offset[i] = base + stride;
             }
         }
         stride <<= 1;
     }
 
-    return offsets;
+    return offset;
 }
 
 void dit2fft(double *input, double *output, unsigned size, int inverse) {
-    unsigned *offsets = radix2offsets(size >> 1),
+    unsigned *offset = gen2fftorder(size >> 1),
         stride = 1, i;
 
     while (size > 2) {
@@ -67,10 +64,10 @@ void dit2fft(double *input, double *output, unsigned size, int inverse) {
     }
 
     for (i = 0; i < stride; i++) {
-        radix2fft(&input[offsets[i] << 1], &output[i << 2], stride);
+        radix2fft(&input[offset[i] << 1], &output[i << 2], stride);
     }
 
-    free(offsets);
+    free(offset);
 
     while (stride > 1) {
         stride >>= 1;

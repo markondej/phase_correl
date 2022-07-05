@@ -158,32 +158,29 @@ private:
             kfi += dfi;
         }
     }
-    static std::size_t *Gen2FFTOffsets(std::size_t size) {
-        std::size_t *offsets = new std::size_t[size],
-            stride = 2, step;
+    static std::size_t *GenInputOrder(std::size_t size) {
+        std::size_t *offset = new std::size_t[size],
+            stride = 1;
 
-        std::memset(offsets, 0xff, sizeof(std::size_t) * size);
-        offsets[0] = 0;
-        if (size > 1) {
-            offsets[size >> 1] = 1;
-        }
+        std::memset(offset, 0xff, sizeof(std::size_t) * size);
+        offset[0] = 0;
 
-        for (step = size >> 2; step > 0; step >>= 1) {
+        for (std::size_t step = size >> 1; step > 0; step >>= 1) {
             std::size_t base = 0;
             for (std::size_t i = 0; i < size; i += step) {
-                if (offsets[i] != SIZE_MAX) {
-                    base = offsets[i];
+                if (offset[i] != SIZE_MAX) {
+                    base = offset[i];
                 } else {
-                    offsets[i] = base + stride;
+                    offset[i] = base + stride;
                 }
             }
             stride <<= 1;
         }
 
-        return offsets;
+        return offset;
     }
     static void Dit2FFT(double *input, double *output, std::size_t size, bool inverse) {
-        std::size_t *offsets = Gen2FFTOffsets(size >> 1),
+        std::size_t *offset = GenInputOrder(size >> 1),
             stride = 1;
 
         while (size > 2) {
@@ -192,10 +189,10 @@ private:
         }
 
         for (std::size_t i = 0; i < stride; i++) {
-            Radix2FFT(&input[offsets[i] << 1], &output[i << 2], stride);
+            Radix2FFT(&input[offset[i] << 1], &output[i << 2], stride);
         }
 
-        delete[] offsets;
+        delete[] offset;
 
         while (stride > 1) {
             stride >>= 1;
