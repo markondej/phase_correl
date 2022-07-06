@@ -3,10 +3,11 @@
 #include <cstring>
 #include <climits>
 #include <complex>
+#include <vector>
 
 class GrayscaleImage {
 public:
-    GrayscaleImage(unsigned width, unsigned height, unsigned char fill) {
+    GrayscaleImage(std::size_t width, std::size_t height, unsigned char fill) {
         data = new unsigned char[width * height];
         memset(data, fill, sizeof(unsigned char) * width * height);
         this->width = width;
@@ -27,25 +28,25 @@ public:
         height = source.height;
         return *this;
     }
-    void DrawRectangle(unsigned x, unsigned y, unsigned width, unsigned height, unsigned char fill) {
-        for (unsigned j = y; j < y + height; j++) {
-            for (unsigned i = x; i < x + width; i++) {
+    void DrawRectangle(std::size_t x, std::size_t y, std::size_t width, std::size_t height, unsigned char fill) {
+        for (std::size_t j = y; j < y + height; j++) {
+            for (std::size_t i = x; i < x + width; i++) {
                 if ((i < this->width) && (j < this->height)) {
                     data[i + j * this->width] = fill;
                 }
             }
         }
     }
-    inline unsigned GetWidth() const {
+    inline std::size_t GetWidth() const {
         return width;
     }
-    inline unsigned GetHeight() const {
+    inline std::size_t GetHeight() const {
         return height;
     }
     const unsigned char *GetData() const {
         return data;
     }
-    void Set(unsigned width, unsigned height, const unsigned char *data) {
+    void Set(std::size_t width, std::size_t height, const unsigned char *data) {
         delete[] data;
         this->data = new unsigned char[width * height];
         memcpy(this->data, data, sizeof(unsigned char) * width * height);
@@ -53,7 +54,7 @@ public:
         this->height = height;
     }
 private:
-    unsigned width, height;
+    std::size_t width, height;
     unsigned char *data;
 };
 
@@ -65,55 +66,53 @@ public:
     PhaseCorrelation &operator=(const PhaseCorrelation&) = delete;
     static void ComputeShift(const GrayscaleImage &image1, const GrayscaleImage &image2, int &deltax, int &deltay) {
         if ((image1.GetWidth() != image2.GetWidth()) || (image1.GetHeight() != image2.GetHeight()) || !image1.GetWidth() || (image1.GetWidth() & (image1.GetWidth() - 1)) || !image1.GetHeight() || (image1.GetHeight() & (image1.GetHeight() - 1))) {
-            throw std::runtime_error("Image dimensions must be equal!");
+            throw std::runtime_error("Image sizes do not match");
         }
 
         if (!image1.GetWidth() || (image1.GetWidth() & (image1.GetWidth() - 1)) || !image1.GetHeight() || (image1.GetHeight() & (image1.GetHeight() - 1))) {
-            throw std::runtime_error("Image dimensions must be power of 2!");
+            throw std::runtime_error("Wrong image size");
         }
 
-        unsigned width = image1.GetWidth(), height = image1.GetHeight();
+        std::size_t width = image1.GetWidth(), height = image1.GetHeight();
 
-        std::complex<double> *data1 = new std::complex<double>[width * height];
-        std::complex<double> *data2 = new std::complex<double>[width * height];
+        std::vector<std::complex<double>> data1, data2;
+        data1.resize(width * height);
+        data2.resize(width * height);
 
         // Convert image pixels to complex number format, use only real part
-        for (unsigned i = 0; i < width * height; i++) {
+        for (std::size_t i = 0; i < width * height; i++) {
             data1[i] = { static_cast<double>(image1.GetData()[i]), 0.0 };
             data2[i] = { static_cast<double>(image2.GetData()[i]), 0.0 };
         } 
 
         // Perform 2D FFT on each image
-        FFT2D(data1, width, height);
-        FFT2D(data2, width, height);
+        FFT2D(data1, width);
+        FFT2D(data2, width);
 
         // Compute normalized cross power spectrum
-        for (unsigned i = 0; i < width * height; i++) {
+        for (std::size_t i = 0; i < width * height; i++) {
             ComputeNormalized(data1[i], data2[i], data1[i]);
         }
 
         // Perform inverse 2D FFT on obtained matrix
-        FFT2D(data1, width, height, true);
+        FFT2D(data1, width, true);
 
         // Search for peak
-        unsigned offset = 0;
+        std::size_t offset = 0;
         double max = 0.0; deltax = 0; deltay = 0;
-        for (unsigned j = 0; j < height; j++)
-            for (unsigned i = 0; i < width; i++) {
+        for (std::size_t j = 0; j < height; j++)
+            for (std::size_t i = 0; i < width; i++) {
                 double d = sqrt(pow(data1[offset].real(), 2) + pow(data1[offset].imag(), 2));
                 if (d > max) {
-                    max = d; deltax = i; deltay = j;
+                    max = d; deltax = static_cast<int>(i); deltay = static_cast<int>(j);
                 }
                 offset++;
             }
 
-        delete[] data1;
-        delete[] data2;
-
-        if ((unsigned)deltax > width >> 1)
-            deltax = deltax - width;
-        if ((unsigned)deltay > height >> 1)
-            deltay = deltay - height;
+        if (deltax > static_cast<int>(width >> 1))
+            deltax = static_cast<int>(deltax - width);
+        if (deltay > static_cast<int>(height >> 1))
+            deltay = static_cast<int>(deltay - height);
     }
 private:
     static void ComputeNormalized(const std::complex<double> &input1, const std::complex<double> &input2, std::complex<double> &output) {
@@ -152,11 +151,12 @@ private:
             kfi += dfi;
         }
     }
-    static std::size_t *GenInputOrder(std::size_t size) {
-        std::size_t *offset = new std::size_t[size],
-            stride = 1;
+    static std::vector<std::size_t> GenInputOrder(std::size_t size) {
+        std::size_t stride = 1;
+        std::vector<std::size_t> offset;
+        offset.resize(size);
 
-        std::memset(offset, 0xff, sizeof(std::size_t) * size);
+        std::memset(offset.data(), 0xff, sizeof(std::size_t) * size);
         offset[0] = 0;
 
         for (std::size_t step = size >> 1; step > 0; step >>= 1) {
@@ -173,9 +173,10 @@ private:
 
         return offset;
     }
-    static void Dit2FFT(const std::complex<double> *input, std::complex<double> *output, std::size_t size, bool inverse = false) {
-        std::size_t *offset = GenInputOrder(size >> 1),
-            stride = 1;
+    static void Dit2FFT(const std::vector<std::complex<double>> &input, std::vector<std::complex<double>> &output, bool inverse = false) {
+        std::size_t stride = 1, size = input.size();
+        auto offset = GenInputOrder(size >> 1);
+        output.resize(size);
 
         while (size > 2) {
             stride <<= 1;
@@ -185,8 +186,6 @@ private:
         for (std::size_t i = 0; i < stride; i++) {
             Radix2FFT(&input[offset[i]], &output[i * 2], stride);
         }
-
-        delete[] offset;
 
         while (stride > 1) {
             stride >>= 1;
@@ -202,37 +201,40 @@ private:
             }
         }
     }
-    static void FFT2D(std::complex<double> *data, unsigned width, unsigned height, bool inverse = false) {
-        std::complex<double>  *fft_input = new std::complex<double>[width > height ? width : height];
-        std::complex<double>  *fft_output = new std::complex<double>[width > height ? width : height];
+    static void FFT2D(std::vector<std::complex<double>> &data, std::size_t width, bool inverse = false) {
+        std::size_t height = data.size() / width;
 
         auto horizontal_fft = [&]() {
-            for (unsigned i = 0; i < width; i++) {
-                unsigned offset = i;
-                for (unsigned j = 0; j < height; j++) {
-                    fft_input[j] = data[offset];
+            std::vector<std::complex<double>> input, output;
+            input.resize(height);
+            for (std::size_t i = 0; i < width; i++) {
+                std::size_t offset = i;
+                for (std::size_t j = 0; j < height; j++) {
+                    input[j] = data[offset];
                     offset += width;
                 }
-                Dit2FFT(fft_input, fft_output, height, inverse);
+                Dit2FFT(input, output, inverse);
                 offset = i;
-                for (unsigned j = 0; j < height; j++) {
-                    data[offset] = fft_output[j];
+                for (std::size_t j = 0; j < height; j++) {
+                    data[offset] = output[j];
                     offset += width;
                 }
             }
         };
 
         auto vertical_fft = [&]() {
-            for (unsigned j = 0; j < height; j++) {
-                unsigned offset = j * width;
-                for (unsigned i = 0; i < width; i++) {
-                    fft_input[i] = data[offset];
+            std::vector<std::complex<double>> input, output;
+            input.resize(width);
+            for (std::size_t j = 0; j < height; j++) {
+                std::size_t offset = j * width;
+                for (std::size_t i = 0; i < width; i++) {
+                    input[i] = data[offset];
                     offset++;
                 }
-                Dit2FFT(fft_input, fft_output, width, inverse);
+                Dit2FFT(input, output, inverse);
                 offset = j * width;
-                for (unsigned i = 0; i < width; i++) {
-                    data[offset] = fft_output[i];
+                for (std::size_t i = 0; i < width; i++) {
+                    data[offset] = output[i];
                     offset++;
                 }
             }
@@ -245,9 +247,6 @@ private:
             horizontal_fft();
             vertical_fft();
         }
-
-        delete[] fft_input;
-        delete[] fft_output;
     }
 };
 
