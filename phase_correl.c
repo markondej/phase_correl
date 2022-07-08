@@ -143,14 +143,14 @@ done:
 }
 
 void computeNormalized(const double *f, const double *g, double *r) {
-    double a1 = (f[1] != 0.0) ? ((f[0] != 0.0) ? atan(f[1] / abs(f[0])) : copysign(M_PI, f[1]) / 2.0) : 0.0;
+    double a1 = (f[1] != 0.0) ? ((f[0] != 0.0) ? atan(f[1] / f[0]) : copysign(M_PI, f[1]) / 2.0) : 0.0;
     if (f[0] < 0.0) {
-        a1 = ((f[1] < 0.0) ? -1.0 : 1.0) * M_PI - a1;
+        a1 = copysign(M_PI, f[1]) + a1;
     }
 
-    double a2 = (g[1] != 0.0) ? ((g[0] != 0.0) ? atan(g[1] / abs(g[0])) : copysign(M_PI, g[1]) / 2.0) : 0.0;
+    double a2 = (g[1] != 0.0) ? ((g[0] != 0.0) ? atan(g[1] / g[0]) : copysign(M_PI, g[1]) / 2.0) : 0.0;
     if (g[0] < 0.0) {
-        a2 = ((g[1] < 0.0) ? -1.0 : 1.0) * M_PI - a2;
+        a2 = copysign(M_PI, g[1]) + a2;
     }
 
     r[0] = cos(a1 - a2);
