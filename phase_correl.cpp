@@ -1,4 +1,4 @@
-﻿#include <cmath>
+#include <cmath>
 #include <iostream>
 #include <cstring>
 #include <climits>
@@ -37,10 +37,10 @@ public:
             }
         }
     }
-    inline std::size_t GetWidth() const {
+    std::size_t GetWidth() const {
         return width;
     }
-    inline std::size_t GetHeight() const {
+    std::size_t GetHeight() const {
         return height;
     }
     const unsigned char *GetData() const {
