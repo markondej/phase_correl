@@ -202,9 +202,9 @@ int computeShift(const unsigned char *image1, const unsigned char *image2, unsig
         }
 
     if (*deltax > width >> 1)
-        *deltax = *deltax - width;
+        *deltax -= width;
     if (*deltay > height >> 1)
-        *deltay = *deltay - height;
+        *deltay -= height;
 
     free(fft_input1);
     free(fft_input2);

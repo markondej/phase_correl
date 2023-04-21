@@ -110,9 +110,9 @@ public:
             }
 
         if (deltax > static_cast<int>(width >> 1))
-            deltax = static_cast<int>(deltax - width);
+            deltax -= static_cast<int>(width);
         if (deltay > static_cast<int>(height >> 1))
-            deltay = static_cast<int>(deltay - height);
+            deltay -= static_cast<int>(height);
     }
 private:
     static void ComputeNormalized(const std::complex<double> &input1, const std::complex<double> &input2, std::complex<double> &output) {
