@@ -118,12 +118,12 @@ private:
     static void ComputeNormalized(const std::complex<double> &input1, const std::complex<double> &input2, std::complex<double> &output) {
         double a1 = (input1.imag() != 0.0) ? ((input1.real() != 0.0) ? atan(input1.imag() / input1.real()) : std::copysign(M_PI, input1.imag()) / 2.0) : 0.0;
         if (input1.real() < 0.0) {
-            a1 = std::copysign(static_cast<float>(M_PI), input1.imag()) + a1;
+            a1 = std::copysign(M_PI, input1.imag()) + a1;
         }
 
         double a2 = (input2.imag() != 0.0) ? ((input2.real() != 0.0) ? atan(input2.imag() / input2.real()) : std::copysign(M_PI, input2.imag()) / 2.0) : 0.0;
         if (input2.real() < 0.0) {
-            a2 = std::copysign(static_cast<float>(M_PI), input2.imag()) + a2;
+            a2 = std::copysign(M_PI, input2.imag()) + a2;
         }
 
         output.real(cos(a1 - a2));
