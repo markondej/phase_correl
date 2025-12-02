@@ -89,7 +89,7 @@ public:
 
         // Compute normalized cross power spectrum
         for (unsigned long i = 0; i < width * height; i++)
-            ComputeNormalized(data1[i], data2[i], data1[i]);
+            CompNormCrossCorrelation(data1[i], data2[i], data1[i]);
 
         // Perform inverse 2D FFT on obtained matrix
         FFT2D(data1, width, true);
@@ -114,7 +114,7 @@ public:
             deltay -= static_cast<long>(height);
     }
 private:
-    static void ComputeNormalized(const std::complex<double> &input1, const std::complex<double> &input2, std::complex<double> &output) {
+    static void CompNormCrossCorrelation(const std::complex<double> &input1, const std::complex<double> &input2, std::complex<double> &output) {
         double diff = std::arg(input1 * std::conj(input2));
 
         output.real(cos(diff));

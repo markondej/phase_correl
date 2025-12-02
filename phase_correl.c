@@ -139,17 +139,15 @@ done:
     return 0;
 }
 
-void computeNormalized(const double *f, const double *g, double *r) {
-    double a1 = (f[1] != 0.0) ? ((f[0] != 0.0) ? atan(f[1] / f[0]) : copysign(M_PI, f[1]) / 2.0) : 0.0;
-    if (f[0] < 0.0)
-        a1 = copysign(M_PI, f[1]) + a1;
+void compNormCrossCorrelation(const double *f, const double *g, double *r) {
+    double cp[] = {
+            f[0] * g[0] + f[1] * g[1],
+            f[1] * g[0] - f[0] * g[1]
+        },
+        diff = atan2(cp[1], cp[0]);
 
-    double a2 = (g[1] != 0.0) ? ((g[0] != 0.0) ? atan(g[1] / g[0]) : copysign(M_PI, g[1]) / 2.0) : 0.0;
-    if (g[0] < 0.0)
-        a2 = copysign(M_PI, g[1]) + a2;
-
-    r[0] = cos(a1 - a2);
-    r[1] = sin(a1 - a2);
+    r[0] = cos(diff);
+    r[1] = sin(diff);
 }
 
 int computeShift(const unsigned char *image1, const unsigned char *image2, unsigned long width, unsigned long height, long *deltax, long *deltay) {
@@ -185,7 +183,7 @@ int computeShift(const unsigned char *image1, const unsigned char *image2, unsig
 
     // Compute normalized cross power spectrum
     for (i = 0; i < width * height; i++)
-        computeNormalized(&fft_input1[i << 1], &fft_input2[i << 1], &fft_output[i << 1]);
+        compNormCrossCorrelation(&fft_input1[i << 1], &fft_input2[i << 1], &fft_output[i << 1]);
 
     // Perform inverse 2D FFT on obtained matrix
     ret = fft2D(fft_output, width, height, 1);
