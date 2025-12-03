@@ -140,11 +140,8 @@ done:
 }
 
 void compNormCrossCorrelation(const double *f, const double *g, double *r) {
-    double cp[] = {
-            f[0] * g[0] + f[1] * g[1],
-            f[1] * g[0] - f[0] * g[1]
-        },
-        diff = atan2(cp[1], cp[0]);
+    double diff = atan2(f[1] * g[0] - f[0] * g[1],
+                        f[0] * g[0] + f[1] * g[1]);
 
     r[0] = cos(diff);
     r[1] = sin(diff);
